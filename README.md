@@ -1,5 +1,6 @@
 ## Execute
 ```
+git checkout dev
 cd FastCMs/
 mkdir build
 cd build

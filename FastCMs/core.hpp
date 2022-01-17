@@ -19,9 +19,11 @@ Edgetype *eg;
 map<pair<int, int>, int> eset;
 map<int, int> coreness;
 
+int k_core_size;
+
 unordered_map<int, vector<int>> cc;
 
-extern int K, b;
+extern int K, b, lambda, record_b;
 map<int, int> is_collapse;
 vector<vector<pair<int, int>>> solution_condidates;
 vector<int> followers_number;
@@ -29,8 +31,9 @@ vector<vector<int>> followers_items;
 vector<int> k_core_vertices;
 map<int, int> k_degree;
 vector<int> single_component;
+vector<pair<int, int>> shell_new_edges;
 vector<pair<int, int>> new_edges;
-
+bool cannot_insert = false;
 inline bool cmp(const pair<int, int>& p1, const pair<int, int>& p2) {
 	return p1.second < p2.second;
 }
@@ -38,22 +41,61 @@ inline bool cmp(const pair<int, int>& p1, const pair<int, int>& p2) {
 void output_data(const string &out_file, const double &total_t, const string algorithm, int &num_followers, const string &graph_name) {
 	std::fstream ff(out_file.c_str(), std::ios::out|std::ios::app);
 	ff << "Graph: " <<  graph_name << endl;
-	ff << algorithm << "+: k = " << K << " b:" << b << " time:" << total_t << " the number of followers:" << num_followers << endl;
+	ff << algorithm << "+: k = " << K << " b:" << record_b << " time:" << total_t << " the number of followers:" << num_followers << endl;
 	ff << "The new edges identified by:" << algorithm << endl;
-	for (const auto &edge: new_edges) {
-	ff << edge.first << " " << edge.second << endl;
-	}
+	//for (const auto &edge: new_edges) {
+	//ff << edge.first << " " << edge.second << endl;
+	//}
 	ff.close();
 }
 
 void clear_everthing() {
 	cc.clear();
+	shell_new_edges.clear();
 	solution_condidates.clear();
 	followers_items.clear();
 	followers_number.clear();
-	new_edges.clear();
 	k_degree.clear();
 	single_component.clear();
+}
+
+void print_shell() {
+	map<int, vector <endpoint>>::iterator p;
+	int count = 0;
+	float sumcore = 0;
+	int shell = 0;
+	int sum = 0;
+	map<int, int> mp;
+	for (p = g.begin(); p != g.end(); p++)
+	{
+		int i = p->first;
+		sumcore += coreness[i];
+		if (coreness[i] >= K)
+			count++;
+		if (coreness[i] == K - 1) {
+			shell++;
+		}
+	}
+	for (int i = 0; i < n; i++)
+	{
+		if (coreness.count(i)) {
+			mp[coreness[i]]++;
+			sum += coreness[i];
+		}
+	}
+	vector<pair<int, int>> vpr;
+	for (map<int, int>::iterator it = mp.begin(); it != mp.end(); it++) {
+		vpr.emplace_back(make_pair(it->first, it->second));
+	}
+	// Print the size of k-shells
+	sort(vpr.begin(), vpr.end(), cmp);
+	for (vector<pair<int, int> >::iterator it = vpr.begin(); it != vpr.end(); it++) {
+		cout << it->first << ":" << it->second << endl;
+	}
+	cout << "coreness_mean" << sumcore / n << endl;
+	k_core_size = count;
+	cout << "the number of" << K << "core is " << count << endl;
+	cout << "the number of k-1-shell:" << shell << endl;
 }
 
 void core_decompostion()
@@ -113,44 +155,13 @@ void core_decompostion()
 	}
 ;
 	printf("maxdegree=%d, maxcore=%d \n", md, maxcore);
-	int count = 0;
-	int count1 = 0;
-	float sumcore = 0;
-	int shell = 0;
 	for (p = g.begin(); p != g.end(); p++)
 	{
 		int i = p->first;
-		sumcore += coreness[i];
-		if (coreness[i] >= K)
-			count++;
 		if (coreness[i] >= K) {
 			k_core_vertices.push_back(i);
-			count1++;
-		}
-		if (coreness[i] == K - 1)
-			shell++;
-	}
-	int sum = 0;
-	map<int, int> mp;
-	for (int i = 0; i < n; i++)
-	{
-		if (coreness.count(i)) {
-			mp[coreness[i]]++;
-			sum += coreness[i];
 		}
 	}
-	vector<pair<int, int>> vpr;
-	for (map<int, int>::iterator it = mp.begin(); it != mp.end(); it++) {
-		vpr.emplace_back(make_pair(it->first, it->second));
-	}
-	// Print the size of k-shells
-	// sort(vpr.begin(), vpr.end(), cmp);
-	// for (vector<pair<int, int> >::iterator it = vpr.begin(); it != vpr.end(); it++) {
-	// 	cout << it->first << ":" << it->second << endl;
-	// }
-	cout << "coreness_mean" << sumcore / n << endl;
-	cout << "the number of" << K << "core is " << count << endl;
-	cout << "the number of k-1-shell:" << shell << endl;
 }
 
 int solution_selection(const int &b) {
@@ -178,75 +189,142 @@ int solution_selection(const int &b) {
 	int n1 = n;
 	for (int i = m; i >= 1; i--) {
 		if (n1 >= w[i - 1] && dp[i][n1] == dp[i - 1][n1 - w[i - 1]] + followers_number[i - 1]) {
-			if (new_edges.empty()) {
-				new_edges = solution_condidates[i - 1];
+			if (shell_new_edges.empty()) {
+				shell_new_edges = solution_condidates[i - 1];
 				followers = followers_items[i - 1];
 			}
 			else
 			{
-				new_edges.insert(new_edges.end(), solution_condidates[i - 1].begin(), solution_condidates[i - 1].end());
+				shell_new_edges.insert(shell_new_edges.end(), solution_condidates[i - 1].begin(), solution_condidates[i - 1].end());
 				followers.insert(followers.end(), followers_items[i - 1].begin(), followers_items[i - 1].end());
 			}
 			n1 = n1 - w[i - 1];
 		}
 	}
-	if (new_edges.size() == b) {
+	if (shell_new_edges.size() == b) {
 		return dp[m][n];
 	} else {
-		int rem = b - new_edges.size();
-		int addi_2 = 0;
-		int addi_1 = 0;
-		map<int, int> del;
-		vector<int> new_single(single_component);
-		for (int i = 0; i < new_single.size(); i++) {
-			if (rem == 0) break;
-			int u = new_single[i];
-			if (del[u] == 1) continue;
-			for (int j = i + 1; j < new_single.size(); j++) {
-				if (i == j) continue;
-				int v = new_single[j];
-				if (del[v] == 1) continue;
-				if (eset.find(pair<int, int>(u, v)) == eset.end()) {
-					followers.push_back(u);
-					followers.push_back(v);
-					pair<int, int>p;
-					p = make_pair(u, v);
-					new_edges.emplace_back(p);
-					rem--;
-					addi_2++;
-					del[u] = 1;
-					del[v] = 1;
-					break;
+		if (lambda == 1) {
+			int rem = b - shell_new_edges.size();
+			int addi_2 = 0;
+			int addi_1 = 0;
+			map<int, int> del;
+			vector<int> new_single(single_component);
+			for (int i = 0; i < new_single.size(); i++) {
+				if (rem == 0) break;
+				int u = new_single[i];
+				if (del[u] == 1) continue;
+				for (int j = i + 1; j < new_single.size(); j++) {
+					if (i == j) continue;
+					int v = new_single[j];
+					if (del[v] == 1) continue;
+					if (eset.find(pair<int, int>(u, v)) == eset.end()) {
+						followers.push_back(u);
+						followers.push_back(v);
+						pair<int, int>p;
+						p = make_pair(u, v);
+						shell_new_edges.emplace_back(p);
+						rem--;
+						addi_2++;
+						del[u] = 1;
+						del[v] = 1;
+						break;
+					}
 				}
 			}
-		}
-		for (int i = 0; i < new_single.size(); i++) {
-			if (rem == 0) break;
-			if (del[new_single[i]] == 1) continue;
-			int u = new_single[i];
-			while(1) {
-				int a = int(rand() % (k_core_vertices.size()));
-				int v = k_core_vertices[a];
-				if (eset.find(pair<int, int>(u, v)) == eset.end())
-				{
-					followers.push_back(u);
-					pair<int, int>p;
-					p = make_pair(u, v);
-					new_edges.push_back(p);
-					addi_1++;
-					k_core_vertices.erase(remove(k_core_vertices.begin(), k_core_vertices.end(), v), k_core_vertices.end());
-					rem--;
-					break;
+			for (int i = 0; i < new_single.size(); i++) {
+				if (rem == 0) break;
+				if (del[new_single[i]] == 1) continue;
+				int u = new_single[i];
+				while(1) {
+					int a = int(rand() % (k_core_vertices.size()));
+					int v = k_core_vertices[a];
+					if (eset.find(pair<int, int>(u, v)) == eset.end())
+					{
+						followers.push_back(u);
+						pair<int, int>p;
+						p = make_pair(u, v);
+						shell_new_edges.push_back(p);
+						addi_1++;
+						k_core_vertices.erase(remove(k_core_vertices.begin(), k_core_vertices.end(), v), k_core_vertices.end());
+						rem--;
+						break;
+					}
 				}
 			}
+			return dp[m][n] + 2 * addi_2 + addi_1;
+		} 
+		else {
+			int rem = b - shell_new_edges.size();
+			map<int, int> single_count;
+			for (const auto v: single_component) {
+				single_count[v] = lambda;
+			}
+			if (rem > lambda * single_component.size()) {
+				for (int i = 0; i < single_component.size(); i++) {
+					int u = single_component[i];
+					if (single_count[u] == 0) continue;
+					for (int j = i + 1; j < single_component.size(); j++) {
+						if (single_count[u] == 0) break;
+						int v = single_component[j];
+						if (single_count[v] == 0) continue;
+						if (eset.find(pair<int, int>(u, v)) == eset.end()) {
+							pair<int, int>p;
+							if (u < v) p = make_pair(u, v);
+							else p = make_pair(v, u);
+							shell_new_edges.emplace_back(p);
+							single_count[u]--;
+							single_count[v]--;
+						}
+					}
+					while (single_count[u] > 0) {
+						int a = rand() % (k_core_vertices.size());
+						int v = k_core_vertices[a];
+						pair<int, int>p;
+						if (eset.find(pair<int, int>(u, v)) != eset.end()) continue;
+						if (u < v) p = make_pair(u, v);
+						else p = make_pair(v, u);
+						if (find(shell_new_edges.begin(), shell_new_edges.end(), p) != shell_new_edges.end()) {
+							continue;
+						}
+						single_count[u]--;
+						shell_new_edges.emplace_back(p);
+					}
+				}
+				return dp[m][n] + single_component.size();
+			}
+			int addi = 0;
+			for (const auto &item : single_count) {
+				int u = item.first, d = item.second;
+				if (rem < d) {
+					cannot_insert = true;
+					break;
+				}
+				if (d == 0) continue;
+				while (d > 0) {
+					int a = rand() % (k_core_vertices.size());
+					int v = k_core_vertices[a];
+					pair<int, int>p;
+					if (eset.find(pair<int, int>(u, v)) != eset.end()) continue;
+					if (u < v) p = make_pair(u, v);
+					else p = make_pair(v, u);
+					if (find(shell_new_edges.begin(), shell_new_edges.end(), p) != shell_new_edges.end()) {
+						continue;
+					}
+					d--;
+					rem--;
+					shell_new_edges.emplace_back(p);
+				}
+				addi++;
+			}
+			return dp[m][n] + addi;
+			for (vector<pair<int, int>>::iterator p = shell_new_edges.begin(); p != shell_new_edges.end(); p++) {
+				int u = p->first;
+				int v = p->second;
+				//cout << u << " " << v << endl;
+			}
+			//cout << "the size of used budget" << shell_new_edges.size() << endl;
 		}
-		for (vector<pair<int, int>>::iterator p = new_edges.begin(); p != new_edges.end(); p++) {
-			int u = p->first;
-			int v = p->second;
-			//cout << u << " " << v << endl;
-		}
-		//cout << "the size of used budget" << new_edges.size();
-		return dp[m][n] + 2 * addi_2 + addi_1;	
 	}
 }
 
@@ -264,15 +342,16 @@ int greedy_solution_selection(int b) {
 		auto vec = item.second;
 		for (auto pos : vec) {
 			C += solution_condidates[pos].size();
+			followers += followers_number[pos];
+			new_edges.insert(new_edges.end(), solution_condidates[pos].begin(), solution_condidates[pos].end());
 			if (C >= b) {
 				return followers;
 			}
-			followers += followers_number[pos];
-			new_edges.insert(new_edges.end(), solution_condidates[pos].begin(), solution_condidates[pos].end());
 		}
 	}
-	int rem = b - C;
-	int addi = 0;
+	int rem = b - new_edges.size();	
+	int addi_2 = 0;
+	int addi_1 = 0;
 	map<int, int> del;
 	vector<int> new_single(single_component);
 	for (int i = 0; i < new_single.size(); i++) {
@@ -284,15 +363,42 @@ int greedy_solution_selection(int b) {
 			int v = new_single[j];
 			if (del[v] == 1) continue;
 			if (eset.find(pair<int, int>(u, v)) == eset.end()) {
+				followers += 2;
+				pair<int, int>p;
+				p = make_pair(u, v);
+				new_edges.emplace_back(p);
 				rem--;
-				addi++;
 				del[u] = 1;
 				del[v] = 1;
 				break;
 			}
 		}
 	}
-	return followers + addi * 2;
+	for (int i = 0; i < new_single.size(); i++) {
+		if (rem == 0) break;
+		if (del[new_single[i]] == 1) continue;
+		int u = new_single[i];
+		while(1) {
+			int a = int(rand() % (k_core_vertices.size()));
+			int v = k_core_vertices[a];
+			if (eset.find(pair<int, int>(u, v)) == eset.end())
+			{
+				pair<int, int>p;
+				p = make_pair(u, v);
+				new_edges.push_back(p);
+				followers++;
+				k_core_vertices.erase(remove(k_core_vertices.begin(), k_core_vertices.end(), v), k_core_vertices.end());
+				rem--;
+				break;
+			}
+		}
+	}
+	for (vector<pair<int, int>>::iterator p = new_edges.begin(); p != new_edges.end(); p++) {
+		int u = p->first;
+		int v = p->second;
+		//cout << u << " " << v << endl;
+	}
+	return followers;
 }
 
 
@@ -304,7 +410,7 @@ void parition_shell() {                    //partiton the k-l-shell
 	for (p = g.begin(); p != g.end(); p++) {
 		int i = p->first;
 		if (g[i].size() == 0) continue;
-		if (coreness[i] == K - 1 && visit[i] == 0) {
+		if (coreness[i] == K - lambda && visit[i] == 0) {
 			q.push(i);
 			visit[i] = 1;
 			cc[index].push_back(i);
@@ -314,10 +420,10 @@ void parition_shell() {                    //partiton the k-l-shell
 				int count = 0;
 				for (int j = 0; j < g[u].size(); j++) {
 					int v = g[u][j].u;
-					if (coreness[v] >= K - 1) {
+					if (coreness[v] >= K - lambda) {
 						count++;
-						if (visit[v] == 1)continue;
-						if (coreness[v] == K - 1) {
+						if (visit[v] == 1) continue;
+						if (coreness[v] == K - lambda) {
 							q.push(v);
 							visit[v] = 1;
 							cc[index].push_back(v);
@@ -325,7 +431,7 @@ void parition_shell() {                    //partiton the k-l-shell
 					}
 				}
 				k_degree[u] = count;
-				if (count < K) {
+				if (count == K - lambda) {
 					is_collapse[u] = 1;
 				}
 			}
@@ -340,11 +446,10 @@ void partial_conversion(vector<int> &ver) {
 	map<int, int> get_layer;
 	map<int, int> del;
 	int l = 0;
-
 	// generate layer strcuture
 	while (!ver.empty()) {
 		for (int i = 0; i < ver.size(); i++) {
-			if (k_degree[ver[i]] < K) {
+			if (k_degree[ver[i]] <= K - lambda) {
 				del[ver[i]] = 1;
 			}
 		}
@@ -371,11 +476,194 @@ void partial_conversion(vector<int> &ver) {
 		}
 		l++;
 	}
+	map<int, vector<int>> act;
+	map<int, int> valid_degree;
 	vector<int> anchored_vertices;
+
+
+	if (lambda > 1) {
+		for (int la = 1; la < l; la++) {      
+			vector<pair<int, int>> res;
+			vector<int> weak;
+			vector<int> partial_vertices;
+			anchored_vertices.clear();
+			for (int y = la; y < l; y++) {
+				for (int t = 0; t < layer[y].size(); t++) {
+					partial_vertices.push_back(layer[y][t]);
+				}
+			}
+			map<int, int> count;
+			int total = 0;
+			for (auto &u: partial_vertices) {
+				int c = 0;
+				for (auto t : g[u]) {
+					int v = t.u;
+					if (coreness[v] > K - lambda || (coreness[v] == K - lambda && get_layer[v] >= l)) {
+						c++;
+					} 
+				}
+				total += K - c;
+				count[u] = c;
+			}
+
+			// Compute Follower Gain 
+			for (int j = 0; j < la; j++) {           
+				for (int t = 0; t < layer[j].size(); t++) {
+					int IncDeg = 0, valid = 0;
+					int u = layer[j][t];
+					for (auto t : g[u]) {
+						int v = t.u;
+						if (get_layer[v] >= la || coreness[v] > K - lambda) {
+							valid++;
+						}
+						if (get_layer[v] >= la) {
+							IncDeg++;
+						}
+					}
+					int Cost = K - valid;
+					if (IncDeg - Cost >= 0) {          
+						for (auto t : g[u]) {
+							int v = t.u;
+							if (coreness[v] != K - lambda) continue;
+							if (get_layer[v] >= la) {
+								act[u].push_back(v);
+							}
+						}
+						valid_degree[u] = valid;
+					}
+				}
+			}
+
+			// Anchor low-layered vertices
+			map<int, vector<int>>::iterator it, p;
+			while (!act.empty()) {			
+				int size = 0;
+				bool flag = false;
+				for (it = act.begin(); it != act.end(); it++) {
+					if (it->second.size() > size) {
+						size = it->second.size();
+						p = it;
+						flag = true;
+					}
+				}
+				if (flag == false) break;
+				anchored_vertices.push_back(p->first);
+				vector<int>::iterator p1;
+				for (const auto &u : p->second) {
+					count[u]--;
+					if (count[u] == 0) {
+						for (it = act.begin(); it != act.end(); it++) {
+							if (it->first == p->first) continue;
+							for (p1 = it->second.begin(); p1 != it->second.end(); ) {
+								if (*p1 == u) {
+									p1 = it->second.erase(p1);
+									break;
+								}
+								else
+									p1++;
+							}
+						}
+					}
+				}
+				act.erase(p->first);
+			}
+			//sort(anchored_vertices.begin(), anchored_vertices.end());
+			if (anchored_vertices.size() > 2 * b) continue;
+			int rem = 0;
+			// for (int t = 0; t < layer[la].size(); t++) {
+			// 	int u = layer[la][t];
+			// 	if (layer_degree_c[u] < K) {
+			// 		rem += K - layer_degree_c[u];
+			// 	}
+			// }
+			if (anchored_vertices.size() != 0) {
+				for (int i = 0; i < anchored_vertices.size() - 1; i++) {
+					for (int j = i + 1; j < anchored_vertices.size(); j++) {
+						if (eset.find(pair<int, int>(anchored_vertices[i], anchored_vertices[j])) != eset.end()) {
+							valid_degree[anchored_vertices[i]]++;
+							valid_degree[anchored_vertices[j]]++;
+						}
+					}
+				}
+			}
+			for (int i = 0; i < anchored_vertices.size(); i++) {
+				int u = anchored_vertices[i];
+				partial_vertices.push_back(u);
+				if (valid_degree[u] >= K) continue;
+				count[u] = K - valid_degree[u];
+			}
+
+
+			//if (total > 2 * b) continue;
+			for (int i = 0; i < partial_vertices.size(); i++) {
+				int u = partial_vertices[i];
+				if (count[u] == 0) continue;
+				for (int j = i + 1; j < partial_vertices.size(); j++) {
+					if (count[u] == 0) break;
+					int v = partial_vertices[j];
+					if (count[v] == 0) continue;
+					if (eset.find(pair<int, int>(u, v)) == eset.end()) {
+						pair<int, int>p;
+						if (u < v) p = make_pair(u, v);
+						else p = make_pair(v, u);
+						res.emplace_back(p);
+						count[u]--;
+						count[v]--;
+					}
+				}
+				if (count[u] > 0) {
+					weak.push_back(u);
+				}
+			}
+			for (int i = 0; i < weak.size(); i++) {
+				int u = weak[i];
+				for (int j = 0; j < ver.size(); j++) {
+					if (count[u] == 0) break;
+					int v = ver[j];
+					if (u == v) continue;
+					if (eset.find(pair<int, int>(u, v)) == eset.end()) {
+						pair<int, int>p;
+						if (u < v) p = make_pair(u, v);
+						else p = make_pair(v, u);
+						if (find(res.begin(), res.end(), p) != res.end()) {
+							continue;
+						}
+						res.emplace_back(p);
+						count[u]--;
+					}
+				}
+				while (count[u] > 0) {
+					//cout << "error";
+					int a = rand() % (k_core_vertices.size());
+					int v = k_core_vertices[a];
+					if (eset.find(pair<int, int>(u, v)) == eset.end()) {
+						pair<int, int>p;
+						if (u < v) p = make_pair(u, v);
+						else p = make_pair(v, u);
+						if (find(res.begin(), res.end(), p) != res.end()) {
+							continue;
+						}
+						count[u]--;
+						res.emplace_back(p);	
+					}
+				}
+			}
+			//cout << "xx" << partial_vertices.size() << "xx" << res.size() << endl;
+			if (res.size() > b) {
+				anchored_vertices.clear();
+				valid_degree.clear();
+				act.clear();
+				continue;
+			}
+			solution_condidates.push_back(res);
+			followers_number.push_back(partial_vertices.size());
+			followers_items.push_back(partial_vertices);	
+			return;
+		}	
+	}
+
 	for (int la = 1; la < l; la++) {
 		map<int, int> layer_degree_c(layer_degree);
-		map<int, vector<int>> act;
-		map<int, int> valid_degree;
 		anchored_vertices.clear();
 		
 		// Compute Follower Gain 
@@ -385,7 +673,7 @@ void partial_conversion(vector<int> &ver) {
 				int u = layer[j][t];
 				for (auto t : g[u]) {
 					int v = t.u;
-					if (get_layer[v] >= la || coreness[v] >= K) {
+					if (get_layer[v] >= la || coreness[v] > K - lambda) {
 						valid++;
 					}
 					if (get_layer[v] == la) {
@@ -396,7 +684,7 @@ void partial_conversion(vector<int> &ver) {
 				if (IncDeg - Cost >= 0) {          
 					for (auto t : g[u]) {
 						int v = t.u;
-						if (coreness[v] != K - 1) continue;
+						if (coreness[v] != K - lambda) continue;
 						if (get_layer[v] == la) {
 							act[u].push_back(v);
 						}
@@ -408,7 +696,7 @@ void partial_conversion(vector<int> &ver) {
 
 		// Anchor low-layered vertices
 		map<int, vector<int>>::iterator it, p;
-		while (!act.empty()) {			
+		while (!act.empty()) {	
 			int size = 0;
 			bool flag = false;
 			for (it = act.begin(); it != act.end(); it++) {
@@ -440,6 +728,7 @@ void partial_conversion(vector<int> &ver) {
 			act.erase(p->first);
 		}
 		sort(anchored_vertices.begin(), anchored_vertices.end());
+		//cout << "anchored_size" << anchored_vertices.size();
 		if (anchored_vertices.size() > 2 * b) continue;
 		int rem = 0;
 		for (int t = 0; t < layer[la].size(); t++) {
@@ -496,7 +785,7 @@ void partial_conversion(vector<int> &ver) {
 						if (find(res.begin(), res.end(), pp) != res.end()) {
 							continue;
 						}
-						res.emplace_back(pp);
+						res.emplace_back(pp); 
 						rem_degree[u]--;
 						rem_degree[v]--;
 						if(rem_degree[u] == 0) {
@@ -513,7 +802,8 @@ void partial_conversion(vector<int> &ver) {
 					if (eset.find(pair<int, int>(u, v)) == eset.end())
 					{
 						pair<int, int>p;
-						p = make_pair(u, v);
+						if (u < v) p = make_pair(u, v);
+						else p = make_pair(v, u);
 						res.emplace_back(p);
 						k_core_vertices.erase(remove(k_core_vertices.begin(), k_core_vertices.end(), v), k_core_vertices.end());
 					}
@@ -528,6 +818,8 @@ void partial_conversion(vector<int> &ver) {
 			record_follower.insert(record_follower.end(), anchored_vertices.begin(), anchored_vertices.end());
 			if (res.size() > b) {
 				anchored_vertices.clear();
+				valid_degree.clear();
+				act.clear();
 				continue;
 			}
 			solution_condidates.push_back(res);
@@ -538,8 +830,11 @@ void partial_conversion(vector<int> &ver) {
 				int v = p->second;
 				//cout << u << " " << v << endl;
 			}
-			//cout << "inserted size:" << res.size();
-			//cout << "followers size:" << followers << endl;
+			// cout << "inserted size:" << res.size();
+			// cout << "followers size:" << followers << endl;
+			// for (auto f : record_follower) {
+			// 	cout << f << " ";
+			// }
 			return;
 		}
 		else
@@ -548,18 +843,35 @@ void partial_conversion(vector<int> &ver) {
 }
 
 
-
+// void insert_new_edges() {
+// 	endpoint a, b;
+// 	for (auto &item : shell_new_edges) {
+// 		Edgetype e;
+// 		int x = item.first;
+// 		int y = item.second;
+// 		eset[pair<int, int>(x, y)] = M;
+// 		eset[pair<int, int>(y, x)] = M;
+// 		a.u = y;
+// 		a.eid = M;
+// 		g[x].push_back(a);
+// 		b.u = x;
+// 		b.eid = M;
+// 		g[y].push_back(b);
+// 		M++;
+// 	}
+// }
 void complete_conversion(vector<int> ver, int flag) {
 	vector<pair<int, int>> res;
 	vector<int> weak;
 	vector<int> collapse;            
-	for (int i = 0; i < ver.size(); i++ ) {
+	for (int i = 0; i < ver.size(); i++) {
 		if (is_collapse[ver[i]] == 1) {
 			collapse.push_back(ver[i]);           // k-1-collpase
 		}
 	}
-	if (collapse.size() > 2 * b) {
-		//cout << "can't convert all the k-1-collapse vertices" << endl;
+	if (collapse.size() * lambda > 2 * b) {
+		cout << "can't convert all the k-1-collapse vertices" << endl;
+		cout << "current size" << ver.size() << endl;
 		if (flag == 1) {
 			partial_conversion(ver);
 		}
@@ -567,46 +879,62 @@ void complete_conversion(vector<int> ver, int flag) {
 	}
 	int rem_degree;
 	map<int, int> del;
+	map<int, int> count;
+	if (lambda > 1) collapse = ver;
+	for (const auto v: collapse) {
+		count[v] = max(0, K - k_degree[v]);
+	}
 	for (int i = 0; i < collapse.size(); i++) {
 		int u = collapse[i];
-		if (del[u] == 1) continue;
+		if (count[u] == 0) continue;
 		for (int j = i + 1; j < collapse.size(); j++) {
+			if (count[u] == 0) break;
 			int v = collapse[j];
-			if (del[v] == 1) continue;
+			if (count[v] == 0) continue;
 			if (eset.find(pair<int, int>(u, v)) == eset.end()) {
 				pair<int, int>p;
-				p = make_pair(u, v);
+				if (u < v) p = make_pair(u, v);
+				else p = make_pair(v, u);
 				res.emplace_back(p);
-				del[u] = 1;
-				del[v] = 1;
-				break;
+				count[u]--;
+				count[v]--;
 			}
 		}
-		if (del[u] == 0) {
+		if (count[u] > 0) {
 			weak.push_back(u);
 		}
 	}
 	for (int i = 0; i < weak.size(); i++) {
 		int u = weak[i];
-		int flag = 0;
 		for (int j = 0; j < ver.size(); j++) {
+			if (count[u] == 0) break;
 			int v = ver[j];
 			if (u == v) continue;
 			if (eset.find(pair<int, int>(u, v)) == eset.end()) {
 				pair<int, int>p;
-				p = make_pair(u, v);
+				if (u < v) p = make_pair(u, v);
+				else p = make_pair(v, u);
+				if (find(res.begin(), res.end(), p) != res.end()) {
+					continue;
+				}
 				res.emplace_back(p);
-				flag = 1;
-				break;
+				count[u]--;
 			}
 		}
-		if (flag == 0) {
+		while (count[u] > 0) {
 			//cout << "error";
 			int a = rand() % (k_core_vertices.size());
 			int v = k_core_vertices[a];
-			pair<int, int>p;
-			p = make_pair(u, v);
-			res.emplace_back(p);
+			if (eset.find(pair<int, int>(u, v)) == eset.end()) {
+				pair<int, int>p;
+				if (u < v) p = make_pair(u, v);
+				else p = make_pair(v, u);
+				if (find(res.begin(), res.end(), p) != res.end()) {
+					continue;
+				}
+				count[u]--;
+				res.emplace_back(p);	
+			}
 		}
 	}
 	if (res.size() == 0) return;

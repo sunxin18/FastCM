@@ -5,4 +5,4 @@ for b in budget
     do
         mkdir build
         cd FastCMs/build
-        ./Demo ../../datasets/${graph_name} ${k} ${b}
+        ./fastcm ../../datasets/${graph_name} ${k} ${b}
