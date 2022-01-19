@@ -298,6 +298,18 @@ int solution_selection(const int &b) {
 				int u = item.first, d = item.second;
 				if (rem < d) {
 					cannot_insert = true;
+					while (rem > 0) {
+						int a = rand() % (k_core_vertices.size());
+						int v = k_core_vertices[a];
+						pair<int, int>p;
+						if (eset.find(pair<int, int>(u, v)) != eset.end()) continue;
+						if (u < v) p = make_pair(u, v);
+						else p = make_pair(v, u);
+						if (find(shell_new_edges.begin(), shell_new_edges.end(), p) != shell_new_edges.end()) {
+							continue;
+						}
+						rem--;
+					}
 					break;
 				}
 				if (d == 0) continue;
@@ -476,7 +488,7 @@ void partial_conversion(vector<int> &ver) {
 		}
 		l++;
 	}
-	map<int, vector<int>> act;
+	map<int, set<int>> act;
 	map<int, int> valid_degree;
 	vector<int> anchored_vertices;
 
@@ -526,7 +538,7 @@ void partial_conversion(vector<int> &ver) {
 							int v = t.u;
 							if (coreness[v] != K - lambda) continue;
 							if (get_layer[v] >= la) {
-								act[u].push_back(v);
+								act[u].insert(v);
 							}
 						}
 						valid_degree[u] = valid;
@@ -535,7 +547,7 @@ void partial_conversion(vector<int> &ver) {
 			}
 
 			// Anchor low-layered vertices
-			map<int, vector<int>>::iterator it, p;
+			map<int, set<int>>::iterator it, p;
 			while (!act.empty()) {			
 				int size = 0;
 				bool flag = false;
@@ -547,24 +559,23 @@ void partial_conversion(vector<int> &ver) {
 					}
 				}
 				if (flag == false) break;
-				anchored_vertices.push_back(p->first);
-				vector<int>::iterator p1;
+				int anchored_vertex = p->first;
+				anchored_vertices.push_back(anchored_vertex);
 				for (const auto &u : p->second) {
 					count[u]--;
 					if (count[u] == 0) {
-						for (it = act.begin(); it != act.end(); it++) {
-							if (it->first == p->first) continue;
-							for (p1 = it->second.begin(); p1 != it->second.end(); ) {
-								if (*p1 == u) {
-									p1 = it->second.erase(p1);
-									break;
-								}
-								else
-									p1++;
+						for (auto t : g[anchored_vertex]) {
+							int v = t.u;
+							if (coreness[v] != K - 1) {
+								continue;
+							}
+							if (act.find(v) != act.end()) {
+								act[v].erase(anchored_vertex);
 							}
 						}
 					}
 				}
+
 				act.erase(p->first);
 			}
 			//sort(anchored_vertices.begin(), anchored_vertices.end());
@@ -686,7 +697,7 @@ void partial_conversion(vector<int> &ver) {
 						int v = t.u;
 						if (coreness[v] != K - lambda) continue;
 						if (get_layer[v] == la) {
-							act[u].push_back(v);
+							act[u].insert(v);
 						}
 					}
 					valid_degree[u] = valid;
@@ -695,7 +706,7 @@ void partial_conversion(vector<int> &ver) {
 		}
 
 		// Anchor low-layered vertices
-		map<int, vector<int>>::iterator it, p;
+		map<int, set<int>>::iterator it, p;
 		while (!act.empty()) {	
 			int size = 0;
 			bool flag = false;
@@ -707,24 +718,24 @@ void partial_conversion(vector<int> &ver) {
 				}
 			}
 			if (flag == false) break;
-			anchored_vertices.push_back(p->first);
-			vector<int>::iterator p1;
+			int anchored_vertex = p->first;
+			anchored_vertices.push_back(anchored_vertex);
 			for (const auto &u : p->second) {
 				layer_degree_c[u]++;
 				if (layer_degree_c[u] == K) {
-					for (it = act.begin(); it != act.end(); it++) {
-						if (it->first == p->first) continue;
-						for (p1 = it->second.begin(); p1 != it->second.end(); ) {
-							if (*p1 == u) {
-								p1 = it->second.erase(p1);
-								break;
-							}
-							else
-								p1++;
+					for (auto t : g[anchored_vertex]) {
+						int v = t.u;
+						if (coreness[v] != K - 1) {
+							continue;
+						}
+						if (act.find(v) != act.end()) {
+							act[v].erase(anchored_vertex);
 						}
 					}
 				}
 			}
+
+			vector<int>::iterator p1;
 			act.erase(p->first);
 		}
 		sort(anchored_vertices.begin(), anchored_vertices.end());
