@@ -43,9 +43,9 @@ void output_data(const string &out_file, const double &total_t, const string alg
 	ff << "Graph: " <<  graph_name << endl;
 	ff << algorithm << "+: k = " << K << " b:" << record_b << " time:" << total_t << " the number of followers:" << num_followers << endl;
 	ff << "The new edges identified by:" << algorithm << endl;
-	//for (const auto &edge: new_edges) {
-	//ff << edge.first << " " << edge.second << endl;
-	//}
+	for (const auto &edge: new_edges) {
+		ff << edge.first << " " << edge.second << endl;
+	}
 	ff.close();
 }
 
@@ -162,6 +162,7 @@ void core_decompostion()
 			k_core_vertices.push_back(i);
 		}
 	}
+	print_shell();
 }
 
 int solution_selection(const int &b) {
@@ -457,6 +458,7 @@ void partial_conversion(vector<int> &ver) {
 	map<int, int> layer_degree;
 	map<int, int> get_layer;
 	map<int, int> del;
+	priority_queue<pair<int, int>, vector<pair<int, int>>, less<pair<int, int>>> heap;
 	int l = 0;
 	// generate layer strcuture
 	while (!ver.empty()) {
@@ -488,13 +490,13 @@ void partial_conversion(vector<int> &ver) {
 		}
 		l++;
 	}
-	map<int, set<int>> act;
-	map<int, int> valid_degree;
-	vector<int> anchored_vertices;
 
 
 	if (lambda > 1) {
 		for (int la = 1; la < l; la++) {      
+			unordered_map<int, int> scores;
+			map<int, int> valid_degree;
+			vector<int> anchored_vertices;
 			vector<pair<int, int>> res;
 			vector<int> weak;
 			vector<int> partial_vertices;
@@ -533,50 +535,53 @@ void partial_conversion(vector<int> &ver) {
 						}
 					}
 					int Cost = K - valid;
-					if (IncDeg - Cost >= 0) {          
-						for (auto t : g[u]) {
-							int v = t.u;
-							if (coreness[v] != K - lambda) continue;
-							if (get_layer[v] >= la) {
-								act[u].insert(v);
-							}
-						}
+					int score = IncDeg - Cost;
+					if (score >= 0) {          
+						scores[u] = score;  
+						heap.emplace(score, u);
 						valid_degree[u] = valid;
 					}
 				}
 			}
 
 			// Anchor low-layered vertices
-			map<int, set<int>>::iterator it, p;
-			while (!act.empty()) {			
-				int size = 0;
-				bool flag = false;
-				for (it = act.begin(); it != act.end(); it++) {
-					if (it->second.size() > size) {
-						size = it->second.size();
-						p = it;
-						flag = true;
+			unordered_map<int, int> if_anchored;
+			while (!heap.empty()) {			
+				while(!heap.empty()) {
+					auto p = heap.top();
+					if (scores[p.second] != p.first) {
+						heap.pop();
+					} else {
+						break;
 					}
 				}
-				if (flag == false) break;
-				int anchored_vertex = p->first;
+				if (heap.empty()) break;
+				auto p = heap.top();
+				heap.pop();
+ 				int anchored_vertex = p.second;
 				anchored_vertices.push_back(anchored_vertex);
-				for (const auto &u : p->second) {
-					count[u]--;
-					if (count[u] == 0) {
-						for (auto t : g[anchored_vertex]) {
-							int v = t.u;
-							if (coreness[v] != K - 1) {
+				if_anchored[anchored_vertex] = 1;
+				for (auto t : g[anchored_vertex]) {
+					int v = t.u;
+					if (count[v] == 0) continue;
+						count[v]--;
+					if (count[v] == 0) {
+						for (auto t : g[v]) {
+							int w = t.u;
+							if (coreness[w] != K - 1) {
 								continue;
 							}
-							if (act.find(v) != act.end()) {
-								act[v].erase(anchored_vertex);
+							if (if_anchored[w] == 0 && scores.find(w) != scores.end()) {
+								if (scores[w] >= 0) {
+									scores[w]--;
+									if (scores[w] >= 0) {
+										heap.emplace(scores[w], w);
+									}
+								}
 							}
 						}
 					}
 				}
-
-				act.erase(p->first);
 			}
 			//sort(anchored_vertices.begin(), anchored_vertices.end());
 			if (anchored_vertices.size() > 2 * b) continue;
@@ -663,7 +668,7 @@ void partial_conversion(vector<int> &ver) {
 			if (res.size() > b) {
 				anchored_vertices.clear();
 				valid_degree.clear();
-				act.clear();
+				scores.clear();
 				continue;
 			}
 			solution_condidates.push_back(res);
@@ -673,9 +678,12 @@ void partial_conversion(vector<int> &ver) {
 		}	
 	}
 
+
 	for (int la = 1; la < l; la++) {
 		map<int, int> layer_degree_c(layer_degree);
-		anchored_vertices.clear();
+		unordered_map<int, int> scores;
+		map<int, int> valid_degree;
+		vector<int> anchored_vertices;
 		
 		// Compute Follower Gain 
 		for (int j = 0; j < la; j++) {           
@@ -684,7 +692,7 @@ void partial_conversion(vector<int> &ver) {
 				int u = layer[j][t];
 				for (auto t : g[u]) {
 					int v = t.u;
-					if (get_layer[v] >= la || coreness[v] > K - lambda) {
+					if (get_layer[v] >= la || coreness[v] > K - 1) {
 						valid++;
 					}
 					if (get_layer[v] == la) {
@@ -692,60 +700,65 @@ void partial_conversion(vector<int> &ver) {
 					}
 				}
 				int Cost = K - valid;
-				if (IncDeg - Cost >= 0) {          
-					for (auto t : g[u]) {
-						int v = t.u;
-						if (coreness[v] != K - lambda) continue;
-						if (get_layer[v] == la) {
-							act[u].insert(v);
-						}
-					}
+				int score = IncDeg - Cost;
+				if (score >= 0) {       
+					scores[u] = score;  
+					heap.emplace(score, u);
 					valid_degree[u] = valid;
 				}
 			}
 		}
 
 		// Anchor low-layered vertices
-		map<int, set<int>>::iterator it, p;
-		while (!act.empty()) {	
-			int size = 0;
-			bool flag = false;
-			for (it = act.begin(); it != act.end(); it++) {
-				if (it->second.size() > size) {
-					size = it->second.size();
-					p = it;
-					flag = true;
+		unordered_map<int, int> if_anchored;
+		while (!heap.empty()) {	
+			while(!heap.empty()) {
+				auto p = heap.top();
+				if (scores[p.second] != p.first) {
+					heap.pop();
+				} else {
+					break;
 				}
 			}
-			if (flag == false) break;
-			int anchored_vertex = p->first;
+			if (heap.empty()) break;
+			auto p = heap.top();
+			cout << p.second << " " << p.first << endl;
+			heap.pop();
+			int anchored_vertex = p.second;
 			anchored_vertices.push_back(anchored_vertex);
-			for (const auto &u : p->second) {
-				layer_degree_c[u]++;
-				if (layer_degree_c[u] == K) {
-					for (auto t : g[anchored_vertex]) {
-						int v = t.u;
-						if (coreness[v] != K - 1) {
+			if_anchored[anchored_vertex] = 1;
+			for (auto t : g[anchored_vertex]) {
+				int v = t.u;
+				if (get_layer[v] != la) continue;
+				if (layer_degree_c[v] == K) continue;
+				layer_degree_c[v]++;
+				if (layer_degree_c[v] == K) {
+					for (auto t : g[v]) {
+						int w = t.u;
+						if (coreness[w] != K - 1) {
 							continue;
 						}
-						if (act.find(v) != act.end()) {
-							act[v].erase(anchored_vertex);
+						if (scores.find(w) != scores.end() && if_anchored[w] == 0) {
+							if (scores[w] >= 0) {
+								scores[w]--;
+								if (scores[w] >= 0) {
+									heap.emplace(scores[w], w);
+								}
+							}
 						}
 					}
 				}
 			}
-
-			vector<int>::iterator p1;
-			act.erase(p->first);
 		}
-		sort(anchored_vertices.begin(), anchored_vertices.end());
-		//cout << "anchored_size" << anchored_vertices.size();
 		if (anchored_vertices.size() > 2 * b) continue;
 		int rem = 0;
+		map<int, int> rem_degree;
 		for (int t = 0; t < layer[la].size(); t++) {
 			int u = layer[la][t];
 			if (layer_degree_c[u] < K) {
-				rem += K - layer_degree_c[u];
+				int require = K - layer_degree_c[u];
+				rem += require;
+				rem_degree[u] = require;
 			}
 		}
 		if (anchored_vertices.size() != 0) {
@@ -758,26 +771,14 @@ void partial_conversion(vector<int> &ver) {
 				}
 			}
 		}
+		for (int i = 0; i < anchored_vertices.size(); i++) {
+			int u = anchored_vertices[i];
+			if (valid_degree[u] >= K) continue;
+			rem_degree[u] = K - valid_degree[u];
+			rem += K - valid_degree[u];
+		}
 		if (rem < 2 * b) {
 			int followers = anchored_vertices.size();
-			map<int, int> rem_degree;
-			int anchored_size = anchored_vertices.size();
-			for (int i = 0; i < anchored_size; i++) {
-				int u = anchored_vertices[i];
-				if (valid_degree[u] >= K) continue;
-				rem_degree[u] = K - valid_degree[u];
-			}
-			for (int t = 0; t < layer[la].size(); t++) {
-				int u = layer[la][t];
-				if (layer_degree_c[u] < K) {
-					int require = K - layer_degree_c[u];
-					rem_degree[u] = require;
-					while (require > 0) {
-						anchored_vertices.push_back(u);
-						require--;
-					}
-				}
-			}
 			vector<pair<int, int>> res;
 			map<int, int>::iterator it, it2;
 			for (it = rem_degree.begin(); it != rem_degree.end(); it++) {
@@ -816,7 +817,6 @@ void partial_conversion(vector<int> &ver) {
 						if (u < v) p = make_pair(u, v);
 						else p = make_pair(v, u);
 						res.emplace_back(p);
-						k_core_vertices.erase(remove(k_core_vertices.begin(), k_core_vertices.end(), v), k_core_vertices.end());
 					}
 					rem_degree[u]--;
 				}
@@ -828,9 +828,6 @@ void partial_conversion(vector<int> &ver) {
 			}
 			record_follower.insert(record_follower.end(), anchored_vertices.begin(), anchored_vertices.end());
 			if (res.size() > b) {
-				anchored_vertices.clear();
-				valid_degree.clear();
-				act.clear();
 				continue;
 			}
 			solution_condidates.push_back(res);
@@ -839,10 +836,10 @@ void partial_conversion(vector<int> &ver) {
 			for (vector < pair<int, int>>::iterator p = res.begin(); p != res.end(); p++) {
 				int u = p->first;
 				int v = p->second;
-				//cout << u << " " << v << endl;
+				cout << u << " " << v << endl;
 			}
-			// cout << "inserted size:" << res.size();
-			// cout << "followers size:" << followers << endl;
+			 cout << "inserted size:" << res.size();
+			 cout << "followers size:" << followers << endl;
 			// for (auto f : record_follower) {
 			// 	cout << f << " ";
 			// }
