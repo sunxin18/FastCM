@@ -1,23 +1,33 @@
-#ifndef _GRAPH_H
-#define _GRAPH_H
+#ifndef _GRAPH_H_
+#define _GRAPH_H_
 
 #include <time.h>
 #include <iostream>
 #include <string>
 #include <memory>
 #include <stdlib.h>
-#include <string.h>
 #include <stdio.h>
 #include <math.h>
 #include <algorithm>
 #include <map>
 #include <vector>
-#include <time.h>
-#include <queue> 
-#include <set>
-#include<unordered_map>
 using namespace std;
 
-#define MAXLENGTH 1000		// Maxmium String Length
 
-#endif  /* _GRAPH_H  */
+// graph 
+struct endpoint
+{
+	int u;
+	int eid;
+};
+
+extern map<pair<int, int>, int> eset;
+extern map<int, int> coreness;
+extern map<int, vector<endpoint>> g;
+extern vector<int> k_core_vertices;
+extern int n, m, dmax;
+
+extern void Readin_Graph(const char *str);
+extern void core_decompostion();
+
+#endif  /* _GRAPH_H_ */

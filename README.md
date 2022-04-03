@@ -1,21 +1,23 @@
+## FastCM+
+This is the source code for the paper "Xin Sun, Xin Huang, Di Jin. Fast Algorithms for Core Maximization on Large Graphs" published at PVLDB 2022. 
 ## Execute
 ```
-git checkout dev
 cd FastCMs/
 mkdir build
 cd build
 cmake ..
 make
-./Demo ../../dataset/xxx.txt
+./fastcm ../../dataset/xxx.txt 
 ```
-
-Then input the k and the budget b, for example:
-20 100
-
+Example:
+```
+./fastcm ../../dataset/Brightkite_edges.txt 20 200
+```
 The results will be written into results.txt.
 
 ## Experiment Datasets
-All the real world datasets can be downloaded from the url described in the paper. We list some of the datasets.
+You can download the graphs used in our paper by following the instructions in Section 7. We list some of the datasets.
 
-We would like to thank authors for kindly sharing source codes of EKC and AKC.
-
+## Acknowledgement
+If you have any further questions, please feel free to contact me.
+If you used this code, please kindly cite the paper.
